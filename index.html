@@ -17,7 +17,8 @@ tr:hover { background: rgba(255,255,255,0.05); transition: 0.2s; }
 </style>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 </head>
-<body class="flex items-center justify-center min-h-screen">
+<body class="flex flex-col items-center pt-8 min-h-screen">
+
 <div id="login-screen" class="w-96 p-8 bg-gradient-to-br from-blue-700 to-cyan-500 rounded-3xl shadow-2xl">
   <h1 class="text-3xl font-bold mb-6 text-white text-center">Вхід за квартирою</h1>
   <input id="apt" type="number" placeholder="Номер квартири" class="w-full mb-3"/><br>
@@ -26,9 +27,12 @@ tr:hover { background: rgba(255,255,255,0.05); transition: 0.2s; }
 </div>
 
 <div id="main-screen" class="hidden flex-col w-11/12 max-w-4xl">
-  <div class="flex justify-between items-center mb-4 mt-4">
-    <h1 class="text-3xl font-bold text-white">Графік прибирань</h1>
-    <button id="addBtn" class="px-5 py-2 bg-green-400 rounded-3xl font-semibold text-gray-900 shadow-lg">Додати запис</button>
+  <div class="flex justify-between items-center mb-4">
+    <h1 class="text-3xl font-bold text-white">Графік прибирань на Бальзака, 86 </h1>
+    <button id="logoutBtn" class="px-3 py-1 bg-red-500 rounded-full font-semibold text-white">Вийти</button>
+  </div>
+  <div class="flex justify-end mb-2">
+    <button id="addBtn" class="px-4 py-1 bg-green-400 rounded-full font-semibold text-gray-900">Додати запис</button>
   </div>
   <div class="overflow-x-auto rounded-2xl shadow-xl">
     <table class="min-w-full border-collapse text-white">
@@ -46,8 +50,8 @@ tr:hover { background: rgba(255,255,255,0.05); transition: 0.2s; }
 </div>
 
 <script>
-let token=null;
-let apt=null;
+let token=localStorage.getItem('token');
+let apt=localStorage.getItem('apt');
 const loginScreen=document.getElementById('login-screen');
 const mainScreen=document.getElementById('main-screen');
 const tbody=document.getElementById('tbody');
@@ -65,16 +69,16 @@ async function loadData(){
         <input type="text" class="w-full bg-slate-800/80 text-white p-1 rounded" value="${row.text}" ${row.author===apt?'':'disabled'}>
       </td>
       <td class="border px-4 py-2 flex gap-2 justify-center">
-        ${row.author===apt?'<button class="updateBtn bg-blue-500 px-3 py-1 rounded text-white font-semibold">Зберегти</button><button class="delBtn bg-red-500 px-3 py-1 rounded text-white font-semibold">Видалити</button>':''}
+        ${row.author===apt?'<button class="delBtn bg-red-500 px-3 py-1 rounded text-white font-semibold">Видалити</button>':''}
       </td>`;
     tbody.appendChild(tr);
 
     if(row.author===apt){
-      tr.querySelector('.updateBtn').onclick=async ()=>{
-        const val=tr.querySelector('input').value;
-        await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,index:i,text:val})});
-        loadData();
-      };
+      const input=tr.querySelector('input');
+      input.addEventListener('input', async ()=>{
+        await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,index:i,text:input.value})});
+      });
+
       tr.querySelector('.delBtn').onclick=async ()=>{
         await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,index:i})});
         loadData();
@@ -83,23 +87,48 @@ async function loadData(){
   });
 }
 
-document.getElementById('loginBtn').onclick=async ()=>{
-  const a=document.getElementById('apt').value;
-  const p=document.getElementById('pass').value;
+// Функція входу
+async function doLogin(a,p){
   const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apt:a,password:p})});
   const data=await r.json();
   if(data.ok){
     token=data.token; apt=data.apt;
+    localStorage.setItem('token',token);
+    localStorage.setItem('apt',apt);
     loginScreen.classList.add('hidden');
     mainScreen.classList.remove('hidden');
     loadData();
   } else alert('Невірний пароль');
+}
+
+// Вхід через кнопку
+document.getElementById('loginBtn').onclick=()=>{
+  const a=document.getElementById('apt').value;
+  const p=document.getElementById('pass').value;
+  doLogin(a,p);
 };
 
+// Кнопка "Вийти"
+document.getElementById('logoutBtn').onclick=()=>{
+  localStorage.removeItem('token');
+  localStorage.removeItem('apt');
+  token=null; apt=null;
+  loginScreen.classList.remove('hidden');
+  mainScreen.classList.add('hidden');
+};
+
+// Додати запис
 document.getElementById('addBtn').onclick=async ()=>{
   await fetch('/api/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
   loadData();
 };
+
+// Якщо вже є токен у localStorage, автоматично логін
+if(token && apt){
+  loginScreen.classList.add('hidden');
+  mainScreen.classList.remove('hidden');
+  loadData();
+}
 </script>
 </body>
 </html>
