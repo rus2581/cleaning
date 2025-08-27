@@ -4,47 +4,50 @@
 <meta charset="UTF-8">
 <title>Графік прибирань</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<style>
-body { 
-  background: linear-gradient(135deg, #0f172a, #1e3a8a); 
-  font-family: 'Poppins', sans-serif; 
-}
-button { transition: all 0.2s ease; }
-button:hover { transform: scale(1.05); }
-input { background:#1e293b; color:#f8fafc; border:none; border-radius:6px; padding:6px 8px; transition:0.2s; }
-input:disabled { background:#0f172a; color:#94a3b8; }
-tr:hover { background: rgba(255,255,255,0.05); transition: 0.2s; }
-</style>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+<style>
+body {
+  background: #f0f4f8;
+  font-family: 'Poppins', sans-serif;
+}
+button { transition: all 0.2s ease; cursor: pointer;}
+button:hover { transform: scale(1.05);}
+input { background:#ffffffaa; color:#111; border:none; border-radius:6px; padding:6px 8px; transition:0.2s; }
+input:disabled { background:#e5e7eb; color:#6b7280; }
+tr:hover { background: rgba(0,0,0,0.05); }
+.icon-btn { display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:#ef4444; color:white; font-weight:bold; }
+</style>
 </head>
 <body class="flex flex-col items-center pt-8 min-h-screen">
 
-<div id="login-screen" class="w-96 p-8 bg-gradient-to-br from-blue-700 to-cyan-500 rounded-3xl shadow-2xl">
-  <h1 class="text-3xl font-bold mb-6 text-white text-center">Вхід за квартирою</h1>
+<!-- Логін -->
+<div id="login-screen" class="w-96 p-8 bg-white rounded-3xl shadow-2xl">
+  <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Вхід за квартирою</h1>
   <input id="apt" type="number" placeholder="Номер квартири" class="w-full mb-3"/><br>
   <input id="pass" type="password" placeholder="Пароль" class="w-full mb-5"/><br>
-  <button id="loginBtn" class="w-full py-3 bg-orange-400 rounded-3xl font-semibold text-gray-900">Увійти</button>
+  <button id="loginBtn" class="w-full py-3 bg-blue-500 rounded-3xl font-semibold text-white">Увійти</button>
 </div>
 
+<!-- Основна таблиця -->
 <div id="main-screen" class="hidden flex-col w-11/12 max-w-4xl">
   <div class="flex justify-between items-center mb-4">
-    <h1 class="text-3xl font-bold text-white">Графік прибирань на Бальзака, 86 </h1>
+    <h1 class="text-2xl font-bold text-gray-800">Графік прибирань</h1>
     <button id="logoutBtn" class="px-3 py-1 bg-red-500 rounded-full font-semibold text-white">Вийти</button>
   </div>
   <div class="flex justify-end mb-2">
-    <button id="addBtn" class="px-4 py-1 bg-green-400 rounded-full font-semibold text-gray-900">Додати запис</button>
+    <button id="addBtn" class="px-4 py-1 bg-green-500 rounded-full font-semibold text-white">Додати запис</button>
   </div>
   <div class="overflow-x-auto rounded-2xl shadow-xl">
-    <table class="min-w-full border-collapse text-white">
-      <thead class="bg-cyan-600">
+    <table class="min-w-full border-collapse text-gray-800">
+      <thead class="bg-gray-200">
         <tr>
-          <th class="px-5 py-3 border">Дата</th>
-          <th class="px-5 py-3 border">Квартира</th>
-          <th class="px-5 py-3 border">Текст</th>
-          <th class="px-5 py-3 border">Дія</th>
+          <th class="px-5 py-3 border-b">Дата</th>
+          <th class="px-5 py-3 border-b">Квартира</th>
+          <th class="px-5 py-3 border-b">Текст</th>
+          <th class="px-5 py-3 border-b"></th>
         </tr>
       </thead>
-      <tbody id="tbody" class="bg-slate-900/80"></tbody>
+      <tbody id="tbody" class="bg-white"></tbody>
     </table>
   </div>
 </div>
@@ -62,18 +65,20 @@ async function loadData(){
   tbody.innerHTML='';
   data.forEach((row,i)=>{
     const tr=document.createElement('tr');
+    const isOwner=row.author===apt;
+    tr.className = i%2===0 ? 'bg-white' : 'bg-gray-50';
     tr.innerHTML=`
       <td class="border px-4 py-2">${row.date}</td>
       <td class="border px-4 py-2">${row.apt}</td>
       <td class="border px-4 py-2">
-        <input type="text" class="w-full bg-slate-800/80 text-white p-1 rounded" value="${row.text}" ${row.author===apt?'':'disabled'}>
+        <input type="text" class="w-full p-1 rounded" value="${row.text}" ${isOwner?'':'disabled'}>
       </td>
-      <td class="border px-4 py-2 flex gap-2 justify-center">
-        ${row.author===apt?'<button class="delBtn bg-red-500 px-3 py-1 rounded text-white font-semibold">Видалити</button>':''}
+      <td class="border px-4 py-2 flex justify-center">
+        ${isOwner?'<button class="delBtn icon-btn">🗑️</button>':''}
       </td>`;
     tbody.appendChild(tr);
 
-    if(row.author===apt){
+    if(isOwner){
       const input=tr.querySelector('input');
       input.addEventListener('input', async ()=>{
         await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,index:i,text:input.value})});
@@ -87,7 +92,6 @@ async function loadData(){
   });
 }
 
-// Функція входу
 async function doLogin(a,p){
   const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apt:a,password:p})});
   const data=await r.json();
@@ -101,14 +105,12 @@ async function doLogin(a,p){
   } else alert('Невірний пароль');
 }
 
-// Вхід через кнопку
 document.getElementById('loginBtn').onclick=()=>{
   const a=document.getElementById('apt').value;
   const p=document.getElementById('pass').value;
   doLogin(a,p);
 };
 
-// Кнопка "Вийти"
 document.getElementById('logoutBtn').onclick=()=>{
   localStorage.removeItem('token');
   localStorage.removeItem('apt');
@@ -117,13 +119,11 @@ document.getElementById('logoutBtn').onclick=()=>{
   mainScreen.classList.add('hidden');
 };
 
-// Додати запис
 document.getElementById('addBtn').onclick=async ()=>{
   await fetch('/api/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
   loadData();
 };
 
-// Якщо вже є токен у localStorage, автоматично логін
 if(token && apt){
   loginScreen.classList.add('hidden');
   mainScreen.classList.remove('hidden');
