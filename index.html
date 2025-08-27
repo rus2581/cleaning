@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <title>Графік прибирань — кв. 10–13</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div class="max-w-6xl mx-auto p-6">
+    <h1 class="text-3xl font-bold mb-4">Графік прибирань — кв. 10, 11, 12, 13</h1>
+
+    <!-- Панель входу -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <script>
+        const flats = [10, 11, 12, 13];
+        document.write(flats.map(n => `
+          <div class="bg-white rounded-2xl shadow p-4">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-lg font-semibold">Кв. ${n}</span>
+              <span id="status-${n}" class="text-xs px-2 py-1 rounded bg-gray-200">гость</span>
+            </div>
+            <div class="flex gap-2">
+              <input id="pass-${n}" type="password" placeholder="пароль" class="w-full border rounded px-3 py-2" />
+              <button data-apt="${n}" class="btn-login px-3 py-2 rounded bg-gray-900 text-white">Увійти</button>
+            </div>
+          </div>`).join(""));
+      </script>
+    </div>
+
+    <!-- Кнопки -->
+    <div class="flex flex-wrap items-center gap-2 mb-4">
+      <button id="add-row" class="px-4 py-2 rounded-2xl bg-white shadow border">Додати рядок</button>
+      <button id="save-all" class="px-4 py-2 rounded-2xl bg-gray-900 text-white shadow">Зберегти мій стовпець</button>
+    </div>
+
+    <!-- Таблиця -->
+    <div class="bg-white rounded-2xl shadow overflow-x-auto">
+      <table id="schedule" class="min-w-full border-collapse">
+        <thead class="bg-gray-800 text-white">
+          <tr>
+            <th class="px-3 py-2 border">Дата</th>
+            <th class="px-3 py-2 border">Квартира №10</th>
+            <th class="px-3 py-2 border">Квартира №11</th>
+            <th class="px-3 py-2 border">Квартира №12</th>
+            <th class="px-3 py-2 border">Квартира №13</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <p class="mt-3 text-sm text-gray-600">Дані зберігаються у <code>schedule.txt</code> біля цього файлу.</p>
+  </div>
+
+<script>
+const tbody = document.getElementById('tbody');
+const addRowBtn = document.getElementById('add-row');
+const saveAllBtn = document.getElementById('save-all');
+const loginBtns = document.querySelectorAll('.btn-login');
+
+let session = { apt: null, token: null };
+
+function makeRow(date='', a10='', a11='', a12='', a13='') {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="border px-2 py-1"><input type="date" class="date-input w-full" value="${date}"/></td>
+    <td class="border px-2 py-1"><input data-col="10" class="cell w-full p-1" value="${a10}" /></td>
+    <td class="border px-2 py-1"><input data-col="11" class="cell w-full p-1" value="${a11}" /></td>
+    <td class="border px-2 py-1"><input data-col="12" class="cell w-full p-1" value="${a12}" /></td>
+    <td class="border px-2 py-1"><input data-col="13" class="cell w-full p-1" value="${a13}" /></td>
+  `;
+  tbody.appendChild(tr);
+  applyLocks();
+}
+
+function applyLocks() {
+  const inputs = tbody.querySelectorAll('input.cell');
+  inputs.forEach(inp => {
+    const col = inp.getAttribute('data-col');
+    inp.disabled = !(session.apt && String(session.apt) === col);
+    inp.classList.toggle('bg-gray-100', inp.disabled);
+  });
+  [10,11,12,13].forEach(n => {
+    const badge = document.getElementById('status-'+n);
+    if (session.apt == n) {
+      badge.textContent = 'увійшов';
+      badge.className = 'text-xs px-2 py-1 rounded bg-green-200 text-green-800';
+    } else {
+      badge.textContent = 'гость';
+      badge.className = 'text-xs px-2 py-1 rounded bg-gray-200';
+    }
+  });
+}
+
+async function loadData() {
+  const r = await fetch('/api/load');
+  const text = await r.text();
+  const lines = text.trim().split(/\r?\n/).slice(1);
+  tbody.innerHTML = '';
+  if (!lines.length) return makeRow();
+  lines.forEach(line => {
+    const [d,a10,a11,a12,a13] = line.split(';');
+    makeRow(d,a10,a11,a12,a13);
+  });
+}
+
+addRowBtn.onclick = () => makeRow();
+
+loginBtns.forEach(btn=>{
+  btn.onclick = async e=>{
+    const apt = e.target.getAttribute('data-apt');
+    const pass = document.getElementById('pass-'+apt).value;
+    const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apt,password:pass})});
+    const data = await r.json();
+    if(data.ok){
+      session = {apt:Number(apt),token:data.token};
+      applyLocks();
+      alert('Вхід успішний');
+    } else alert('Пароль невірний');
+  };
+});
+
+saveAllBtn.onclick = async ()=>{
+  if(!session.token) return alert('Увійдіть!');
+  const rows=[];
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const date=tr.querySelector('.date-input').value;
+    const val=tr.querySelector('[data-col="'+session.apt+'"]').value;
+    if(date) rows.push({date,value:val});
+  });
+  const r = await fetch('/api/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:session.token,apt:session.apt,rows})});
+  const d=await r.json();
+  if(d.ok){alert('Збережено'); loadData();}
+};
+
+loadData();
+</script>
+</body>
+</html>
