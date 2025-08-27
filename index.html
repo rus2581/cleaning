@@ -20,6 +20,7 @@ tr:hover { background: rgba(0,0,0,0.05); }
 </head>
 <body class="flex flex-col items-center pt-8 min-h-screen">
 
+<!-- Логін -->
 <div id="login-screen" class="w-96 p-8 bg-white rounded-3xl shadow-2xl">
   <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Вхід за квартирою</h1>
   <input id="apt" type="number" placeholder="Номер квартири" class="w-full mb-3"/><br>
@@ -27,6 +28,7 @@ tr:hover { background: rgba(0,0,0,0.05); }
   <button id="loginBtn" class="w-full py-3 bg-blue-500 rounded-3xl font-semibold text-white">Увійти</button>
 </div>
 
+<!-- Таблиця -->
 <div id="main-screen" class="hidden flex-col w-11/12 max-w-4xl">
   <div class="flex justify-between items-center mb-4">
     <h1 class="text-2xl font-bold text-gray-800">Графік прибирань</h1>
@@ -57,6 +59,7 @@ const loginScreen = document.getElementById('login-screen');
 const mainScreen = document.getElementById('main-screen');
 const tbody = document.getElementById('tbody');
 
+// Завантажити та відобразити записи
 async function loadData() {
   const r = await fetch('/api/load');
   const data = await r.json();
@@ -81,7 +84,7 @@ async function loadData() {
       input.addEventListener('input', async () => {
         await fetch('/api/update', {
           method: 'POST',
-          headers: {'Content-Type':'application/json'},
+          headers: { 'Content-Type':'application/json' },
           body: JSON.stringify({token, index:i, text: input.value})
         });
       });
@@ -98,6 +101,7 @@ async function loadData() {
   });
 }
 
+// Логін
 async function doLogin(a, p){
   const r = await fetch('/api/login', {
     method:'POST',
@@ -131,6 +135,7 @@ document.getElementById('logoutBtn').onclick = () => {
 };
 
 document.getElementById('addBtn').onclick = async () => {
+  if(!token) return alert('Ви не авторизовані!');
   await fetch('/api/add', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
@@ -139,7 +144,8 @@ document.getElementById('addBtn').onclick = async () => {
   loadData();
 };
 
-if (token && apt) {
+// Автовхід якщо токен збережено
+if(token && apt){
   loginScreen.classList.add('hidden');
   mainScreen.classList.remove('hidden');
   loadData();
