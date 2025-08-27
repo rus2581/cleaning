@@ -10,9 +10,9 @@ body {
   background: #f0f4f8;
   font-family: 'Poppins', sans-serif;
 }
-button { transition: all 0.2s ease; cursor: pointer;}
-button:hover { transform: scale(1.05);}
-input { background:#ffffffaa; color:#111; border:none; border-radius:6px; padding:6px 8px; transition:0.2s; }
+button { transition: all 0.2s ease; cursor: pointer; }
+button:hover { transform: scale(1.05); }
+input { background:#ffffffaa; color:#111; border:none; border-radius:6px; padding:6px 8px; transition:0.2s; text-align:center; }
 input:disabled { background:#e5e7eb; color:#6b7280; }
 tr:hover { background: rgba(0,0,0,0.05); }
 .icon-btn { display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; background:#ef4444; color:white; font-weight:bold; }
@@ -20,7 +20,6 @@ tr:hover { background: rgba(0,0,0,0.05); }
 </head>
 <body class="flex flex-col items-center pt-8 min-h-screen">
 
-<!-- Логін -->
 <div id="login-screen" class="w-96 p-8 bg-white rounded-3xl shadow-2xl">
   <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Вхід за квартирою</h1>
   <input id="apt" type="number" placeholder="Номер квартири" class="w-full mb-3"/><br>
@@ -28,7 +27,6 @@ tr:hover { background: rgba(0,0,0,0.05); }
   <button id="loginBtn" class="w-full py-3 bg-blue-500 rounded-3xl font-semibold text-white">Увійти</button>
 </div>
 
-<!-- Основна таблиця -->
 <div id="main-screen" class="hidden flex-col w-11/12 max-w-4xl">
   <div class="flex justify-between items-center mb-4">
     <h1 class="text-2xl font-bold text-gray-800">Графік прибирань</h1>
@@ -41,10 +39,10 @@ tr:hover { background: rgba(0,0,0,0.05); }
     <table class="min-w-full border-collapse text-gray-800">
       <thead class="bg-gray-200">
         <tr>
-          <th class="px-5 py-3 border-b">Дата</th>
-          <th class="px-5 py-3 border-b">Квартира</th>
-          <th class="px-5 py-3 border-b">Текст</th>
-          <th class="px-5 py-3 border-b"></th>
+          <th class="px-5 py-3 border text-center">Дата</th>
+          <th class="px-5 py-3 border text-center">Квартира</th>
+          <th class="px-5 py-3 border text-center">Текст</th>
+          <th class="px-5 py-3 border text-center"></th>
         </tr>
       </thead>
       <tbody id="tbody" class="bg-white"></tbody>
@@ -53,78 +51,95 @@ tr:hover { background: rgba(0,0,0,0.05); }
 </div>
 
 <script>
-let token=localStorage.getItem('token');
-let apt=localStorage.getItem('apt');
-const loginScreen=document.getElementById('login-screen');
-const mainScreen=document.getElementById('main-screen');
-const tbody=document.getElementById('tbody');
+let token = localStorage.getItem('token');
+let apt = localStorage.getItem('apt');
+const loginScreen = document.getElementById('login-screen');
+const mainScreen = document.getElementById('main-screen');
+const tbody = document.getElementById('tbody');
 
-async function loadData(){
-  const r=await fetch('/api/load');
-  const data=await r.json();
-  tbody.innerHTML='';
-  data.forEach((row,i)=>{
-    const tr=document.createElement('tr');
-    const isOwner=row.author===apt;
-    tr.className = i%2===0 ? 'bg-white' : 'bg-gray-50';
-    tr.innerHTML=`
-      <td class="border px-4 py-2">${row.date}</td>
-      <td class="border px-4 py-2">${row.apt}</td>
-      <td class="border px-4 py-2">
-        <input type="text" class="w-full p-1 rounded" value="${row.text}" ${isOwner?'':'disabled'}>
+async function loadData() {
+  const r = await fetch('/api/load');
+  const data = await r.json();
+  tbody.innerHTML = '';
+  data.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    const isOwner = row.author === apt;
+    tr.className = i % 2 === 0 ? 'bg-white' : 'bg-gray-50';
+    tr.innerHTML = `
+      <td class="border px-4 py-2 text-center">${row.date}</td>
+      <td class="border px-4 py-2 text-center">${row.apt}</td>
+      <td class="border px-4 py-2 text-center">
+        <input type="text" class="w-full p-1 rounded text-center" value="${row.text}" ${isOwner ? '' : 'disabled'}>
       </td>
       <td class="border px-4 py-2 flex justify-center">
-        ${isOwner?'<button class="delBtn icon-btn">🗑️</button>':''}
+        ${isOwner ? '<button class="delBtn icon-btn">🗑️</button>' : ''}
       </td>`;
     tbody.appendChild(tr);
 
-    if(isOwner){
-      const input=tr.querySelector('input');
-      input.addEventListener('input', async ()=>{
-        await fetch('/api/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,index:i,text:input.value})});
+    if (isOwner) {
+      const input = tr.querySelector('input');
+      input.addEventListener('input', async () => {
+        await fetch('/api/update', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({token, index:i, text: input.value})
+        });
       });
 
-      tr.querySelector('.delBtn').onclick=async ()=>{
-        await fetch('/api/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,index:i})});
+      tr.querySelector('.delBtn').onclick = async () => {
+        await fetch('/api/delete', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({token, index:i})
+        });
         loadData();
       };
     }
   });
 }
 
-async function doLogin(a,p){
-  const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({apt:a,password:p})});
-  const data=await r.json();
+async function doLogin(a, p){
+  const r = await fetch('/api/login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({apt:a, password:p})
+  });
+  const data = await r.json();
   if(data.ok){
-    token=data.token; apt=data.apt;
-    localStorage.setItem('token',token);
-    localStorage.setItem('apt',apt);
+    token = data.token;
+    apt = data.apt;
+    localStorage.setItem('token', token);
+    localStorage.setItem('apt', apt);
     loginScreen.classList.add('hidden');
     mainScreen.classList.remove('hidden');
     loadData();
   } else alert('Невірний пароль');
 }
 
-document.getElementById('loginBtn').onclick=()=>{
-  const a=document.getElementById('apt').value;
-  const p=document.getElementById('pass').value;
-  doLogin(a,p);
+document.getElementById('loginBtn').onclick = () => {
+  const a = document.getElementById('apt').value;
+  const p = document.getElementById('pass').value;
+  doLogin(a, p);
 };
 
-document.getElementById('logoutBtn').onclick=()=>{
+document.getElementById('logoutBtn').onclick = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('apt');
-  token=null; apt=null;
+  token = null; apt = null;
   loginScreen.classList.remove('hidden');
   mainScreen.classList.add('hidden');
 };
 
-document.getElementById('addBtn').onclick=async ()=>{
-  await fetch('/api/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token})});
+document.getElementById('addBtn').onclick = async () => {
+  await fetch('/api/add', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({token})
+  });
   loadData();
 };
 
-if(token && apt){
+if (token && apt) {
   loginScreen.classList.add('hidden');
   mainScreen.classList.remove('hidden');
   loadData();
