@@ -12,17 +12,34 @@ if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n', 'utf8');
 }
 
+// Файл паролів
+const PASS_FILE = 'passwords.txt';
+if (!fs.existsSync(PASS_FILE)) {
+  fs.writeFileSync(PASS_FILE, '10;10\n11;11\n12;12\n13;13\n', 'utf8');
+}
+
 // Сесії для авторизації
 const sessions = new Map();
 
-// Логін
+// Логін через passwords.txt
 app.post('/api/login', (req, res) => {
   const { apt, password } = req.body;
-  if (Number(password) === Number(apt)) {
-    const token = Math.random().toString(36).substr(2, 16);
+
+  const lines = fs.readFileSync(PASS_FILE, 'utf8')
+                  .trim().split('\n');
+
+  const valid = lines.some(line => {
+    const [a,p] = line.split(';');
+    return String(a) === String(apt) && String(p) === String(password);
+  });
+
+  if(valid){
+    const token = Math.random().toString(36).substr(2,16);
     sessions.set(token, apt);
     res.json({ ok: true, token, apt });
-  } else res.json({ ok: false });
+  } else {
+    res.json({ ok: false });
+  }
 });
 
 // Завантаження даних
@@ -30,7 +47,7 @@ app.get('/api/load', (req, res) => {
   const lines = fs.readFileSync(DATA_FILE, 'utf8')
     .split('\n')
     .map(l => l.trim())
-    .filter(l => l && !l.startsWith('Дата;')); // видаляємо шапку і порожні рядки
+    .filter(l => l && !l.startsWith('Дата;'));
 
   const data = lines.map(line => {
     const [date, apt, author, text] = line.split(';');
@@ -71,8 +88,7 @@ app.post('/api/update', (req, res) => {
   parts[3] = text;
   lines[index] = parts.join(';');
 
-  // Записуємо шапку + дані назад
-  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n' + lines.join('\n') + '\n', 'utf8');
+  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n' + lines.join('\n') + '\n','utf8');
   res.json({ ok: true });
 });
 
