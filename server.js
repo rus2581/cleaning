@@ -25,11 +25,11 @@ const sessions = new Map();
 app.post('/api/login', (req, res) => {
   const { apt, password } = req.body;
 
-  const lines = fs.readFileSync(PASS_FILE, 'utf8')
+  const lines = fs.readFileSync(PASS_FILE,'utf8')
                   .trim().split('\n');
 
   const valid = lines.some(line => {
-    const [a,p] = line.split(';');
+    const [a,p] = line.split(';').map(s => s.trim());
     return String(a) === String(apt) && String(p) === String(password);
   });
 
@@ -113,5 +113,4 @@ app.post('/api/delete', (req, res) => {
   res.json({ ok: true });
 });
 
-// Запуск сервера
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
