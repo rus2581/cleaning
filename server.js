@@ -14,7 +14,7 @@ const sessions = new Map(); // token -> apt
 // Логін (пароль = номер квартири)
 app.post('/api/login', (req,res)=>{
   const {apt,password} = req.body;
-  if(String(password) === String(apt)){
+  if(Number(password) === Number(apt)){
     const token = Math.random().toString(36).substr(2,16);
     sessions.set(token, apt);
     res.json({ok:true, token, apt});
