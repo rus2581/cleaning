@@ -1,135 +1,153 @@
 const express = require('express');
 const fs = require('fs');
+const { google } = require('googleapis');
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 app.use(express.static('.'));
 
-// Файл даних
-const DATA_FILE = 'schedule.txt';
-if (!fs.existsSync(DATA_FILE)) {
-  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n', 'utf8');
+// === Этап 6: создаем JSON из переменной окружения ===
+fs.writeFileSync('service-account.json', process.env.GOOGLE_SERVICE_ACCOUNT);
+
+// === Google Drive API setup ===
+const KEYFILE = './service-account.json';
+const FOLDER_ID = '1g5BkD-BjIOJvoqwcXFeqxbLnYXCJoZiS'; // вставь сюда ID папки на Google Drive
+
+const auth = new google.auth.GoogleAuth({
+  keyFile: KEYFILE,
+  scopes: ['https://www.googleapis.com/auth/drive']
+});
+const drive = google.drive({ version: 'v3', auth });
+
+// === Сессии для авторизации ===
+const sessions = new Map();
+
+// === Функции работы с Google Drive ===
+async function loadFile(filename) {
+  const res = await drive.files.list({
+    q: `'${FOLDER_ID}' in parents and name='${filename}'`,
+    fields: 'files(id,name)'
+  });
+  if (!res.data.files.length) return '';
+  const fileId = res.data.files[0].id;
+  const file = await drive.files.get({ fileId, alt: 'media' }, { responseType: 'text' });
+  return file.data;
 }
 
-// Файл паролів
+async function saveFile(filename, content) {
+  const res = await drive.files.list({
+    q: `'${FOLDER_ID}' in parents and name='${filename}'`,
+    fields: 'files(id,name)'
+  });
+  if (!res.data.files.length) {
+    await drive.files.create({
+      requestBody: { name: filename, parents: [FOLDER_ID] },
+      media: { mimeType: 'text/plain', body: content }
+    });
+  } else {
+    const fileId = res.data.files[0].id;
+    await drive.files.update({ fileId, media: { mimeType: 'text/plain', body: content } });
+  }
+}
+
+async function appendFile(filename, content) {
+  const existing = await loadFile(filename);
+  await saveFile(filename, existing + content);
+}
+
+// === Файл с паролями квартир ===
 const PASS_FILE = 'passwords.txt';
 if (!fs.existsSync(PASS_FILE)) {
   fs.writeFileSync(PASS_FILE, '10;10\n11;11\n12;12\n13;13\n', 'utf8');
 }
 
-// Файл логів
-const LOG_FILE = 'activity.log';
-if (!fs.existsSync(LOG_FILE)) {
-  fs.writeFileSync(LOG_FILE, '', 'utf8');
-}
-
-// Сесії для авторизації
-const sessions = new Map();
-
-// Функція для логування
-function logActivity(req, action, extra='') {
-  const ip = req.ip || req.connection.remoteAddress;
+// === Логирование действий ===
+async function logActivity(user, action, extra='') {
   const date = new Date().toISOString();
-  const user = sessions.get(req.body.token) || 'Неавторизований';
-  const line = `${date};${ip};${user};${action};${extra}\n`;
-  fs.appendFileSync(LOG_FILE, line, 'utf8');
+  const line = `${date};${user};${action};${extra}\n`;
+  await appendFile('activity.log', line);
 }
 
-// Логін через passwords.txt
-app.post('/api/login', (req, res) => {
+// === API ===
+
+// Логин
+app.post('/api/login', async (req, res) => {
   const { apt, password } = req.body;
-
-  const lines = fs.readFileSync(PASS_FILE,'utf8').trim().split('\n');
-
-  const valid = lines.some(line => {
-    const [a,p] = line.split(';').map(s => s.trim());
-    return String(a) === String(apt) && String(p) === String(password);
-  });
+  const lines = fs.readFileSync(PASS_FILE, 'utf8').trim().split('\n');
+  const valid = lines.some(line => line.split(';').map(s=>s.trim()).join('') === apt + password);
 
   if(valid){
     const token = Math.random().toString(36).substr(2,16);
     sessions.set(token, apt);
-    logActivity(req, 'login', `Успішний вхід, квартира ${apt}`);
+    await logActivity(apt, 'login', 'успешный вход');
     res.json({ ok: true, token, apt });
   } else {
-    logActivity(req, 'login', `Невдалий вхід, квартира ${apt}`);
+    await logActivity(apt, 'login', 'неудачный вход');
     res.json({ ok: false });
   }
 });
 
-// Завантаження даних
-app.get('/api/load', (req, res) => {
-  const lines = fs.readFileSync(DATA_FILE, 'utf8')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('Дата;'));
-
+// Загрузка данных таблицы
+app.get('/api/load', async (req, res) => {
+  const dataRaw = await loadFile('schedule.txt');
+  const lines = dataRaw.split('\n').filter(l=>l.trim() && !l.startsWith('Дата;'));
   const data = lines.map(line => {
     const [date, apt, author, text] = line.split(';');
-    return { date: date || '', apt: apt || '', author: author || '', text: text || '' };
+    return { date, apt, author, text };
   });
-
   res.json(data);
 });
 
-// Додавання запису
-app.post('/api/add', (req, res) => {
+// Добавление записи
+app.post('/api/add', async (req, res) => {
   const { token } = req.body;
-  if (!sessions.has(token)) return res.json({ ok: false });
-
+  if (!sessions.has(token)) return res.json({ ok:false });
   const apt = sessions.get(token);
-  const date = new Date().toISOString().slice(0, 10);
+  const date = new Date().toISOString().slice(0,10);
   const text = 'Прибрано';
-
-  fs.appendFileSync(DATA_FILE, `${date};${apt};${apt};${text}\n`, 'utf8');
-  logActivity(req, 'add', `Додано запис для квартири ${apt}`);
-  res.json({ ok: true });
+  await appendFile('schedule.txt', `${date};${apt};${apt};${text}\n`);
+  await logActivity(apt, 'add', 'Добавлена запись');
+  res.json({ ok:true });
 });
 
-// Оновлення запису
-app.post('/api/update', (req, res) => {
+// Обновление записи
+app.post('/api/update', async (req, res) => {
   const { token, index, text } = req.body;
-  if (!sessions.has(token)) return res.json({ ok: false });
-
-  const lines = fs.readFileSync(DATA_FILE, 'utf8')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('Дата;'));
-
-  if (!lines[index]) return res.json({ ok: false });
+  if (!sessions.has(token)) return res.json({ ok:false });
+  const apt = sessions.get(token);
+  const dataRaw = await loadFile('schedule.txt');
+  const lines = dataRaw.split('\n').filter(l=>l.trim() && !l.startsWith('Дата;'));
+  if (!lines[index]) return res.json({ ok:false });
 
   const parts = lines[index].split(';');
-  if (parts[2] !== sessions.get(token)) return res.json({ ok: false });
+  if (parts[2] !== apt) return res.json({ ok:false });
 
   parts[3] = text;
   lines[index] = parts.join(';');
-  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n'+lines.join('\n')+'\n','utf8');
-
-  logActivity(req, 'update', `Оновлено запис #${index} для квартири ${parts[1]}`);
-  res.json({ ok: true });
+  await saveFile('schedule.txt', 'Дата;Квартира;Автор;Текст\n' + lines.join('\n') + '\n');
+  await logActivity(apt, 'update', `Обновлена запись #${index}`);
+  res.json({ ok:true });
 });
 
-// Видалення запису
-app.post('/api/delete', (req, res) => {
+// Удаление записи
+app.post('/api/delete', async (req, res) => {
   const { token, index } = req.body;
-  if (!sessions.has(token)) return res.json({ ok: false });
-
-  const lines = fs.readFileSync(DATA_FILE, 'utf8')
-    .split('\n')
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith('Дата;'));
-
-  if (!lines[index]) return res.json({ ok: false });
+  if (!sessions.has(token)) return res.json({ ok:false });
+  const apt = sessions.get(token);
+  const dataRaw = await loadFile('schedule.txt');
+  const lines = dataRaw.split('\n').filter(l=>l.trim() && !l.startsWith('Дата;'));
+  if (!lines[index]) return res.json({ ok:false });
 
   const parts = lines[index].split(';');
-  if (parts[2] !== sessions.get(token)) return res.json({ ok: false });
+  if (parts[2] !== apt) return res.json({ ok:false });
 
-  lines.splice(index, 1);
-  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n'+lines.join('\n')+'\n','utf8');
-
-  logActivity(req, 'delete', `Видалено запис #${index} для квартири ${parts[1]}`);
-  res.json({ ok: true });
+  lines.splice(index,1);
+  await saveFile('schedule.txt', 'Дата;Квартира;Автор;Текст\n' + lines.join('\n') + '\n');
+  await logActivity(apt, 'delete', `Удалена запись #${index}`);
+  res.json({ ok:true });
 });
 
+// Запуск сервера
 app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
