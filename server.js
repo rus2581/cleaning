@@ -18,15 +18,29 @@ if (!fs.existsSync(PASS_FILE)) {
   fs.writeFileSync(PASS_FILE, '10;10\n11;11\n12;12\n13;13\n', 'utf8');
 }
 
+// Файл логів
+const LOG_FILE = 'activity.log';
+if (!fs.existsSync(LOG_FILE)) {
+  fs.writeFileSync(LOG_FILE, '', 'utf8');
+}
+
 // Сесії для авторизації
 const sessions = new Map();
+
+// Функція для логування
+function logActivity(req, action, extra='') {
+  const ip = req.ip || req.connection.remoteAddress;
+  const date = new Date().toISOString();
+  const user = sessions.get(req.body.token) || 'Неавторизований';
+  const line = `${date};${ip};${user};${action};${extra}\n`;
+  fs.appendFileSync(LOG_FILE, line, 'utf8');
+}
 
 // Логін через passwords.txt
 app.post('/api/login', (req, res) => {
   const { apt, password } = req.body;
 
-  const lines = fs.readFileSync(PASS_FILE,'utf8')
-                  .trim().split('\n');
+  const lines = fs.readFileSync(PASS_FILE,'utf8').trim().split('\n');
 
   const valid = lines.some(line => {
     const [a,p] = line.split(';').map(s => s.trim());
@@ -36,8 +50,10 @@ app.post('/api/login', (req, res) => {
   if(valid){
     const token = Math.random().toString(36).substr(2,16);
     sessions.set(token, apt);
+    logActivity(req, 'login', `Успішний вхід, квартира ${apt}`);
     res.json({ ok: true, token, apt });
   } else {
+    logActivity(req, 'login', `Невдалий вхід, квартира ${apt}`);
     res.json({ ok: false });
   }
 });
@@ -67,6 +83,7 @@ app.post('/api/add', (req, res) => {
   const text = 'Прибрано';
 
   fs.appendFileSync(DATA_FILE, `${date};${apt};${apt};${text}\n`, 'utf8');
+  logActivity(req, 'add', `Додано запис для квартири ${apt}`);
   res.json({ ok: true });
 });
 
@@ -87,8 +104,9 @@ app.post('/api/update', (req, res) => {
 
   parts[3] = text;
   lines[index] = parts.join(';');
+  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n'+lines.join('\n')+'\n','utf8');
 
-  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n' + lines.join('\n') + '\n','utf8');
+  logActivity(req, 'update', `Оновлено запис #${index} для квартири ${parts[1]}`);
   res.json({ ok: true });
 });
 
@@ -108,8 +126,9 @@ app.post('/api/delete', (req, res) => {
   if (parts[2] !== sessions.get(token)) return res.json({ ok: false });
 
   lines.splice(index, 1);
+  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n'+lines.join('\n')+'\n','utf8');
 
-  fs.writeFileSync(DATA_FILE, 'Дата;Квартира;Автор;Текст\n' + lines.join('\n') + '\n', 'utf8');
+  logActivity(req, 'delete', `Видалено запис #${index} для квартири ${parts[1]}`);
   res.json({ ok: true });
 });
 
