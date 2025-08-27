@@ -5,36 +5,44 @@
 <title>Графік прибирань</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-body { background-color:#1e1e2f; color:#f0f0f5; font-family:sans-serif;}
-button:hover { opacity:0.8; transition:0.2s; }
-input { background:#2a2a40; color:#f0f0f5; border:none; border-radius:4px; padding:4px 6px;}
-input:disabled { background:#1a1a2a; color:#888; }
+body { 
+  background: linear-gradient(135deg, #0f172a, #1e3a8a); 
+  font-family: 'Poppins', sans-serif; 
+}
+button { transition: all 0.2s ease; }
+button:hover { transform: scale(1.05); }
+input { background:#1e293b; color:#f8fafc; border:none; border-radius:6px; padding:6px 8px; transition:0.2s; }
+input:disabled { background:#0f172a; color:#94a3b8; }
+tr:hover { background: rgba(255,255,255,0.05); transition: 0.2s; }
 </style>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body class="flex items-center justify-center min-h-screen">
-<div id="login-screen" class="w-96 p-6 bg-gray-800 rounded-2xl shadow-lg">
-  <h1 class="text-2xl font-bold mb-4 text-center">Вхід за квартирою</h1>
-  <input id="apt" type="number" placeholder="Номер квартири" class="w-full mb-2"/><br>
-  <input id="pass" type="password" placeholder="Пароль" class="w-full mb-4"/><br>
-  <button id="loginBtn" class="w-full py-2 bg-purple-600 rounded-2xl text-white font-semibold">Увійти</button>
+<div id="login-screen" class="w-96 p-8 bg-gradient-to-br from-blue-700 to-cyan-500 rounded-3xl shadow-2xl">
+  <h1 class="text-3xl font-bold mb-6 text-white text-center">Вхід за квартирою</h1>
+  <input id="apt" type="number" placeholder="Номер квартири" class="w-full mb-3"/><br>
+  <input id="pass" type="password" placeholder="Пароль" class="w-full mb-5"/><br>
+  <button id="loginBtn" class="w-full py-3 bg-orange-400 rounded-3xl font-semibold text-gray-900">Увійти</button>
 </div>
 
 <div id="main-screen" class="hidden flex-col w-11/12 max-w-4xl">
   <div class="flex justify-between items-center mb-4 mt-4">
-    <h1 class="text-2xl font-bold">Графік прибирань</h1>
-    <button id="addBtn" class="px-4 py-2 bg-green-600 rounded-2xl font-semibold">Додати запис</button>
+    <h1 class="text-3xl font-bold text-white">Графік прибирань</h1>
+    <button id="addBtn" class="px-5 py-2 bg-green-400 rounded-3xl font-semibold text-gray-900 shadow-lg">Додати запис</button>
   </div>
-  <table class="min-w-full border-collapse">
-    <thead class="bg-gray-700 text-white">
-      <tr>
-        <th class="px-4 py-2 border">Дата</th>
-        <th class="px-4 py-2 border">Квартира</th>
-        <th class="px-4 py-2 border">Текст</th>
-        <th class="px-4 py-2 border">Дія</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
+  <div class="overflow-x-auto rounded-2xl shadow-xl">
+    <table class="min-w-full border-collapse text-white">
+      <thead class="bg-cyan-600">
+        <tr>
+          <th class="px-5 py-3 border">Дата</th>
+          <th class="px-5 py-3 border">Квартира</th>
+          <th class="px-5 py-3 border">Текст</th>
+          <th class="px-5 py-3 border">Дія</th>
+        </tr>
+      </thead>
+      <tbody id="tbody" class="bg-slate-900/80"></tbody>
+    </table>
+  </div>
 </div>
 
 <script>
@@ -51,13 +59,13 @@ async function loadData(){
   data.forEach((row,i)=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`
-      <td class="border px-2 py-1">${row.date}</td>
-      <td class="border px-2 py-1">${row.apt}</td>
-      <td class="border px-2 py-1">
-        <input type="text" class="w-full" value="${row.text}" ${row.author===apt?'':'disabled'}>
+      <td class="border px-4 py-2">${row.date}</td>
+      <td class="border px-4 py-2">${row.apt}</td>
+      <td class="border px-4 py-2">
+        <input type="text" class="w-full bg-slate-800/80 text-white p-1 rounded" value="${row.text}" ${row.author===apt?'':'disabled'}>
       </td>
-      <td class="border px-2 py-1 flex gap-1">
-        ${row.author===apt?'<button class="updateBtn bg-blue-600 px-2 rounded text-white">Зберегти</button><button class="delBtn bg-red-600 px-2 rounded text-white">Видалити</button>':''}
+      <td class="border px-4 py-2 flex gap-2 justify-center">
+        ${row.author===apt?'<button class="updateBtn bg-blue-500 px-3 py-1 rounded text-white font-semibold">Зберегти</button><button class="delBtn bg-red-500 px-3 py-1 rounded text-white font-semibold">Видалити</button>':''}
       </td>`;
     tbody.appendChild(tr);
 
